@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { WinCtx } from '../../core/registry';
 import { MenuBar } from '../../ui/MenuBar';
 import { GameApi, GameDef, GameInst, hsGet, hsSet } from './kit';
+import { sfx } from '../../core/sfx';
 
 const ARROWS = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' '];
 
@@ -60,6 +61,8 @@ export function GameHost({ def, win, opts }: { def: GameDef; win?: WinCtx; opts?
         if (s.dead) return;
         s.dead = true;
         setOver(msg || 'Game over');
+        if (/win|cleared|matched|beat/i.test(msg || '') && !/computer wins|friend wins/i.test(msg || '')) sfx.win();
+        else sfx.lose();
       },
       refresh: () => setV((v) => v + 1),
       rnd: (a, b) => a + Math.random() * (b - a),

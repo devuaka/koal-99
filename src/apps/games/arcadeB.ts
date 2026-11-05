@@ -1,4 +1,5 @@
 // koal.games, part 2: Alien Blaster, Block Stack, Rock Blaster, Cube Jump, Whack-a-Cube, Connect Four, Simon Says.
+import { sfx } from '../../core/sfx';
 import { Ctx, GameDef, eyes, gloss, jellyCube, label, orb, rr, sky } from './kit';
 
 const TAU = Math.PI * 2;
@@ -41,7 +42,7 @@ export const aliens: GameDef = {
       speed = 26 + wave * 8;
     };
     build();
-    const fire = () => !bullet && (bullet = { x: px + 15, y: 480 });
+    const fire = () => !bullet && ((bullet = { x: px + 15, y: 480 }), sfx.zap({ vol: 0.6 }));
     const COL = ['#ff5c7a', '#ffb84d', '#6ee86e', '#5fc8ff'];
     return {
       key(k, d) {
@@ -81,6 +82,7 @@ export const aliens: GameDef = {
             const h = live.find((x) => Math.abs(x.x + 15 - b.x) < 16 && Math.abs(x.y + 10 - b.y) < 14);
             if (h) {
               h.alive = false;
+              sfx.crunch({ pitch: 1.2 + h.r * 0.15, vol: 0.7 });
               bullet = null;
               a.addScore(10 + (3 - h.r) * 5);
             }
@@ -101,6 +103,7 @@ export const aliens: GameDef = {
               b.y = 999;
               lives--;
               inv = 1.2;
+              sfx.hurt();
               if (lives <= 0) a.over('Game over');
             }
       },
@@ -186,7 +189,9 @@ export const stack: GameDef = {
         lines += n;
         level = 1 + Math.floor(lines / 8);
         a.addScore([0, 100, 300, 500, 800][n] * level);
+        for (let k = 0; k < n + 1; k++) window.setTimeout(() => sfx.marimba(k * 2 + 3), k * 70);
       }
+      if (!n) sfx.knock({ pitch: 0.7, vol: 0.6 });
       spawn();
     };
     const drop = () => (fits(cur.m, cur.x, cur.y + 1) ? cur.y++ : lock());
@@ -198,8 +203,8 @@ export const stack: GameDef = {
     return {
       key(k, d) {
         if (!d) return;
-        if (k === 'ArrowLeft' || k === 'a') fits(cur.m, cur.x - 1, cur.y) && cur.x--;
-        else if (k === 'ArrowRight' || k === 'd') fits(cur.m, cur.x + 1, cur.y) && cur.x++;
+        if (k === 'ArrowLeft' || k === 'a') fits(cur.m, cur.x - 1, cur.y) && (cur.x--, sfx.click({ vol: 0.5 }));
+        else if (k === 'ArrowRight' || k === 'd') fits(cur.m, cur.x + 1, cur.y) && (cur.x++, sfx.click({ vol: 0.5 }));
         else if (k === 'ArrowDown' || k === 's') {
           drop();
           a.addScore(1);
@@ -209,6 +214,7 @@ export const stack: GameDef = {
             if (fits(r, cur.x + o, cur.y)) {
               cur.m = r;
               cur.x += o;
+              sfx.flip({ vol: 0.6 });
               break;
             }
         } else if (k === ' ') {
@@ -216,6 +222,7 @@ export const stack: GameDef = {
             cur.y++;
             a.addScore(2);
           }
+          sfx.whoosh(false, { vol: 0.35 });
           lock();
         }
       },
@@ -312,6 +319,7 @@ export const rocks: GameDef = {
         cool -= dt;
         if (k[' '] && cool <= 0) {
           cool = 0.22;
+          sfx.zap({ pitch: 1.3, vol: 0.5 });
           bullets.push({ x: ship.x + Math.cos(ship.a) * 14, y: ship.y + Math.sin(ship.a) * 14, vx: Math.cos(ship.a) * 440 + ship.vx, vy: Math.sin(ship.a) * 440 + ship.vy, t: 1.1 });
         }
         bullets.forEach((b) => ((b.x += b.vx * dt), (b.y += b.vy * dt), (b.t -= dt), wrap(b)));
@@ -321,6 +329,7 @@ export const rocks: GameDef = {
           for (const r of rocksL)
             if (!r.dead && Math.hypot(b.x - r.x, b.y - r.y) < r.r) {
               r.dead = true;
+              r.s > 1 ? sfx.crunch({ pitch: 0.6 + (3 - r.s) * 0.3 }) : sfx.boom(0.3, { vol: 0.5 });
               b.t = 0;
               a.addScore((4 - r.s) * 20);
               for (let i = 0; i < 10; i++) parts.push({ x: r.x, y: r.y, vx: a.rnd(-90, 90), vy: a.rnd(-90, 90), t: 0.6 });
@@ -335,6 +344,7 @@ export const rocks: GameDef = {
             if (Math.hypot(ship.x - r.x, ship.y - r.y) < r.r + 8) {
               lives--;
               inv = 2.5;
+              sfx.boom(0.8);
               ship = { x: 280, y: 260, vx: 0, vy: 0, a: -Math.PI / 2 };
               if (lives <= 0) a.over('Game over');
               break;
@@ -444,6 +454,7 @@ export const jump: GameDef = {
             if (y > p.y - 4 && y < p.y + 16 && x > p.x - 10 && x < p.x + p.w + 10 && y - vy * dt <= p.y + 6) {
               vy = -720;
               y = p.y;
+              sfx.pop({ pitch: p.mv ? 0.9 : 0.7, vol: 0.6 });
             }
         if (y < cam + 260) cam = y - 260;
         for (let n = 0; n < 40 && (plats.length < 16 || Math.min(...plats.map((p) => p.y)) - 45 > cam - 40); n++) plats.push(mk(Math.min(...plats.map((p) => p.y)) - a.rnd(40, 90)));
@@ -512,6 +523,8 @@ export const whack: GameDef = {
           if (h.life > 0 && h.hit <= 0 && Math.hypot(x - h.x, y - (h.y - 22)) < 46) {
             h.life = 0;
             h.hit = 0.35;
+            sfx.thud();
+            sfx.pop({ pitch: 1.3, vol: 0.5 });
             a.addScore(10);
           }
       },
@@ -628,7 +641,8 @@ export const four: GameDef = {
         if (v > best) (best = v), (bc = c);
       }
       drop(b, bc, 2);
-      if (fourIn(b, 2)) res = 'The computer wins. Click to play again';
+      sfx.knock({ pitch: 0.75 });
+      if (fourIn(b, 2)) (res = 'The computer wins. Click to play again'), sfx.lose();
       else if (full(b)) res = 'Draw. Click to play again';
       turn = 1;
       busy = false;
@@ -645,8 +659,10 @@ export const four: GameDef = {
           return;
         }
         if (busy || turn !== 1 || drop(b, hover, 1) < 0) return;
+        sfx.knock({ pitch: 0.9 });
         if (fourIn(b, 1)) {
           res = 'You win! Click to play again';
+          sfx.win();
           return a.addScore(10);
         }
         if (full(b)) return void (res = 'Draw. Click to play again');
@@ -706,6 +722,7 @@ export const simon: GameDef = {
       if (phase !== 'in') return;
       lit = i;
       t = 0.25;
+      sfx.marimba([0, 2, 4, 6][i] + 2);
       if (seq[idx] === i) {
         if (++idx === seq.length) {
           a.addScore(seq.length * 10);
@@ -726,7 +743,7 @@ export const simon: GameDef = {
         }
         if (phase === 'show') {
           if (lit >= 0) (lit = -1), (t = 0.2);
-          else if (pi < seq.length) (lit = seq[pi++]), (t = 0.45);
+          else if (pi < seq.length) (lit = seq[pi++]), (t = 0.45), sfx.marimba([0, 2, 4, 6][lit] + 2);
           else phase = 'in';
         } else lit = -1;
       },

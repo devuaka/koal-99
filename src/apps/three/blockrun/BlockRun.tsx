@@ -7,6 +7,18 @@ import { createStage, THREE } from '../engine';
 import { Character, blobShadow } from '../models';
 import { Look } from '../r3';
 import { reportHosted } from '../../../core/invites';
+import { sfx, SfxOpts } from '../../../core/sfx';
+
+/** The sound a block makes when it breaks or is placed. */
+function blockSound(id: number, o: SfxOpts = {}, placed = false) {
+  if (id === 9) return placed ? sfx.knock({ ...o, pitch: 1.6 }) : sfx.glass(o);
+  if (id === 6) return sfx.whoosh(false, { ...o, pitch: 1.8, vol: (o.vol ?? 1) * 0.6 });
+  if (id === 10) return sfx.splash(o);
+  if (id === 5 || id === 7) return placed ? sfx.knock({ ...o, pitch: 0.7 }) : (sfx.knock({ ...o, pitch: 0.6 }), sfx.crunch({ ...o, pitch: 0.8, vol: (o.vol ?? 1) * 0.5 }));
+  if (id === 3 || id === 8 || id === 12) return placed ? sfx.thud({ ...o, pitch: 1.5 }) : sfx.crunch({ ...o, pitch: 1.3 });
+  return placed ? sfx.thud({ ...o, pitch: 1.2, vol: (o.vol ?? 1) * 0.7 }) : sfx.crunch({ ...o, pitch: 0.7 });
+}
+const SURFACE: Record<number, 'grass' | 'stone' | 'wood' | 'concrete'> = { 1: 'grass', 2: 'grass', 4: 'grass', 6: 'grass', 3: 'stone', 8: 'stone', 5: 'wood', 7: 'wood', 9: 'concrete', 11: 'concrete', 12: 'stone' };
 import { BLOCKS, CH, H, HOT, OPQ, SEA, SOLID, isoIcon, makeAtlas, meshChunk, paintTile, terrain, tileColor, MeshData } from './world';
 
 const SAVE_KEY = 'koalos.blockrun', PIX_KEY = 'koalos.blockrun.custompix', NAME_KEY = 'koalos.brname';
@@ -275,15 +287,26 @@ export function BlockRun({ win }: { win: WinCtx }) {
       else if (wet) P.vy = Math.max(-3, Math.min(3.2, P.vy + (keys.space ? 3 : -6) * dt * 3));
       else {
         P.vy = Math.max(-40, P.vy - 26 * dt);
-        if (keys.space && P.ground) (P.vy = 8.6), (P.ground = false);
+        if (keys.space && P.ground) (P.vy = 8.6), (P.ground = false), sfx.whoosh(true, { vol: 0.25, pitch: 1.3 });
       }
+      const wasGround = P.ground, fallV = P.vy;
       P.ground = false;
       moveAxis('x', P.vx * dt);
       moveAxis('z', P.vz * dt);
       moveAxis('y', P.vy * dt);
       if (P.y < -20) (P.y = 60), (P.vy = 0);
       if (len > 0.1 && (P.ground || fly)) walkT += dt * (keys.shift ? 12 : 8.5);
+      const under = getB(Math.floor(P.x), Math.floor(P.y - 0.1), Math.floor(P.z));
+      if (P.ground && !wasGround && fallV < -7) sfx.step(SURFACE[under] ?? 'stone', { vol: Math.min(1, -fallV / 14) }), sfx.thud({ vol: Math.min(0.8, -fallV / 30) });
+      if (P.ground && len > 0.1) {
+        stepAcc += dt * (keys.shift ? 12 : 8.5);
+        if (stepAcc > Math.PI) (stepAcc -= Math.PI), sfx.step(SURFACE[under] ?? 'stone', { vol: keys.shift ? 0.7 : 0.5 });
+      }
+      const wet2 = inWater();
+      if (wet2 && !wasWet && fallV < -3) sfx.splash();
+      wasWet = wet2;
     };
+    let stepAcc = 0, wasWet = false;
 
     // ---- interaction ----
     const dirVec = (): [number, number, number] => {
@@ -326,6 +349,7 @@ export function BlockRun({ win }: { win: WinCtx }) {
       if (!target || target.y <= 0) return;
       const id = getB(target.x, target.y, target.z);
       burst(target.x, target.y, target.z, id);
+      blockSound(id);
       setB(target.x, target.y, target.z, 0);
       swing = 1;
     };
@@ -334,7 +358,7 @@ export function BlockRun({ win }: { win: WinCtx }) {
       const x = target.x + target.n[0], y = target.y + target.n[1], z = target.z + target.n[2];
       if (y < 0 || y >= H || !canPlace(x, y, z)) return;
       const cur = getB(x, y, z);
-      if (cur === 0 || cur === 10) (setB(x, y, z, HOT[selI]), (swing = 1));
+      if (cur === 0 || cur === 10) (setB(x, y, z, HOT[selI]), (swing = 1), blockSound(HOT[selI], {}, true));
     };
     let flashT = 0;
     const showFlash = (t: string) => {
@@ -508,6 +532,10 @@ export function BlockRun({ win }: { win: WinCtx }) {
         } else if (d.t === 'edit') {
           const prevId = getB(d.x, d.y, d.z);
           if (!d.id && prevId) burst(d.x, d.y, d.z, prevId);
+          {
+            const dist = Math.hypot(d.x + 0.5 - P.x, d.y - P.y, d.z + 0.5 - P.z);
+            if (dist < 24) blockSound(d.id || prevId, { vol: Math.max(0, 1 - dist / 24) ** 1.4, pan: ((d.x + 0.5 - P.x) * Math.cos(look.yaw) + (d.z + 0.5 - P.z) * Math.sin(look.yaw)) / Math.max(1, dist) }, !!d.id);
+          }
           setB(d.x, d.y, d.z, d.id, true);
         } else if (d.t === 'block') (pix = { ...d.pix }), applyPix();
         else if (d.t === 'p') {

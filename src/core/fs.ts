@@ -437,6 +437,13 @@ let chan: BroadcastChannel | null = null;
 try {
   chan = new BroadcastChannel('koal99-fs');
   chan.onmessage = async (ev) => {
+    // another tab ran resetalldata: stop saving and start fresh too
+    if (ev.data?.wipe && ev.data.from !== TAB) {
+      wiping = true;
+      window.clearTimeout(saveTimer);
+      window.setTimeout(() => location.reload(), 900);
+      return;
+    }
     if (ev.data?.from === TAB || saveTimer !== undefined) return;
     const saved = await idbGet<{ schema: number; nodes: Record<string, FSNode> }>('fs');
     if (saved?.nodes?.[ROOT]) fsStore.set((s) => ({ nodes: saved.nodes, version: s.version + 1 }));
@@ -454,9 +461,28 @@ function scheduleSave() {
   }, 300);
 }
 
+let wiping = false;
+/** Erases everything KOAL-99 keeps in this browser (pretend disk, settings, saves) and reloads. */
+export function wipeAllData() {
+  wiping = true;
+  window.clearTimeout(saveTimer);
+  chan?.postMessage({ from: TAB, wipe: true });
+  try {
+    localStorage.clear();
+    sessionStorage.clear();
+  } catch {
+    /* storage blocked */
+  }
+  const req = indexedDB.deleteDatabase('koal99');
+  const go = () => location.reload();
+  req.onsuccess = req.onerror = req.onblocked = () => window.setTimeout(go, 50);
+  window.setTimeout(go, 1500);
+}
+
 export function flushSave() {
   window.clearTimeout(saveTimer);
   saveTimer = undefined;
+  if (wiping) return Promise.resolve();
   return idbSet('fs', { schema: SCHEMA, nodes: fsStore.get().nodes }).then(() => chan?.postMessage({ from: TAB }));
 }
 

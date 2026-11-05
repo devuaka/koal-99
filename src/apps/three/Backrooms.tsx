@@ -8,6 +8,7 @@ import { Character, Entity, blobShadow, rbox } from './models';
 import { Look } from './r3';
 import { LobbyResult, RoomLobby } from './Lobby';
 import { reportHosted } from '../../core/invites';
+import { hum, sfx, spatial } from '../../core/sfx';
 
 export function bkHash(x: number, z: number, s: number) {
   let h = Math.imul(x | 0, 374761393) ^ Math.imul(z | 0, 668265263) ^ Math.imul(s | 0, 2246822519);
@@ -264,6 +265,7 @@ function Game({ s, color, onExit }: { s: LobbyResult; color: string; onExit(): v
       entity.root.visible = true;
       monster = { until: performance.now() + ms };
       dreadT = performance.now();
+      sfx.sting();
     };
 
     let keys: Record<string, boolean> = {}, isPaused = true, lastSend = 0, bobT = 0;
@@ -273,6 +275,8 @@ function Game({ s, color, onExit }: { s: LobbyResult; color: string; onExit(): v
       if (p) keys = {};
     };
     const look = new Look(c, { onUnlock: () => setP(true) });
+    const amb = hum();
+    let stepAcc = 0, lastBeat = 0;
     if (room) {
       room.on('join', (p: any) => {
         addOther(p.id, p.name || 'Player', p.color);
@@ -311,7 +315,11 @@ function Game({ s, color, onExit }: { s: LobbyResult; color: string; onExit(): v
       if (!walls.some((b) => overl(nx, me.z, b))) me.x = nx;
       const nz = me.z + dz * spd * dt;
       if (!walls.some((b) => overl(me.x, nz, b))) me.z = nz;
-      if (l > 0.1) bobT += dt * (keys.shift ? 11 : 8);
+      if (l > 0.1) {
+        bobT += dt * (keys.shift ? 11 : 8);
+        stepAcc += dt * (keys.shift ? 11 : 8);
+        if (stepAcc > Math.PI) (stepAcc -= Math.PI), sfx.step('carpet', { vol: keys.shift ? 0.8 : 0.55 });
+      }
     };
 
     const pool: HTMLDivElement[] = [];
@@ -373,6 +381,7 @@ function Game({ s, color, onExit }: { s: LobbyResult; color: string; onExit(): v
         const t = now / 1000, fl = 0.86 + 0.12 * Math.sin(t * 6.3) * Math.max(0, Math.sin(t * 0.5)) + 0.02 * Math.sin(t * 41);
         panelM.color.setRGB(1.7 * fl, 1.6 * fl, 1.25 * fl);
         hemi.intensity = 1.1 * fl;
+        amb.set(0.6 + fl * 0.4);
         lampSpots.sort((a, b) => (a.x - me.x) ** 2 + (a.z - me.z) ** 2 - ((b.x - me.x) ** 2 + (b.z - me.z) ** 2));
         lamps.forEach((l, i) => {
           const p = lampSpots[i];
@@ -392,6 +401,10 @@ function Game({ s, color, onExit }: { s: LobbyResult; color: string; onExit(): v
           o.ch.root.position.set(o.sx, 0, o.sz);
           o.ch.root.rotation.y = Math.PI - o.yaw;
           o.ch.update(dt, o.spd);
+          if (o.spd > 1) {
+            (o as any).sa = ((o as any).sa ?? 0) + dt * o.spd * 2.4;
+            if ((o as any).sa > Math.PI) ((o as any).sa -= Math.PI), sfx.step('carpet', spatial(o.sx, o.sz, me.x, me.z, look.yaw, 18));
+          }
         }
         if (room && now - lastSend > 60) {
           lastSend = now;
@@ -406,6 +419,7 @@ function Game({ s, color, onExit }: { s: LobbyResult; color: string; onExit(): v
         if (monster && now >= monster.until) (monster = null), (entity.root.visible = false);
         if (entity.root.visible) entity.update(dt);
         const scared = now - dreadT < 3500;
+        if (scared && now - lastBeat > 850) (lastBeat = now), sfx.heartbeat();
         if (hud.current) {
           hud.current.textContent = (room ? `Room code: ${room.code}   ·   ${room.count} / 4 players` : 'Exploring alone') + '   ·   ' + (scared ? 'Something is behind you...' : 'You feel like you have been here before...');
           hud.current.classList.toggle('scared', scared);
@@ -436,6 +450,7 @@ function Game({ s, color, onExit }: { s: LobbyResult; color: string; onExit(): v
       removeEventListener('keyup', kd);
       document.removeEventListener('pointerdown', away);
       look.dispose();
+      amb.stop();
       pool.forEach((d) => d.remove());
       st.dispose();
       cleanup();

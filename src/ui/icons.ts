@@ -622,7 +622,8 @@ I.sun = I.star;
   I.g_four = tile('#3f8fe8', '#0d3a8a', [0, 1, 2].map((r) => [0, 1, 2, 3].map((c) => `<circle cx="${12 + c * 8}" cy="${16 + r * 8}" r="3.2" fill="${(r === 2 && c < 3) || (r === 1 && c === 1) ? '#ef3b3b' : r === 2 || (r === 1 && c === 2) ? '#ffd21f' : '#dcecff'}"/>`).join('')).join(''));
   I.g_simon = tile('#16305e', '#081631', `<path d="M24 24V10a14 14 0 0 0-14 14z" fill="#1f9a3a"/><path d="M24 24V10a14 14 0 0 1 14 14z" fill="#ff5c5c"/><path d="M24 24h14a14 14 0 0 1-14 14z" fill="#ffd21f"/><path d="M24 24h-14a14 14 0 0 0 14 14z" fill="#3d8fff"/><circle cx="24" cy="24" r="5" fill="#16305e" stroke="#fff" stroke-opacity=".5"/>`);
   I.g_chess = tile('#eaf4ff', '#6f9fd6', `<text x="24" y="36" font-family="Segoe UI Symbol,Segoe UI,Arial" font-size="30" text-anchor="middle" fill="#14305e" stroke="#fff" stroke-width=".8">♞</text>`);
-  I.g_cuberun = tile('#5b5fe8', '#39c6f0', `<rect x="5" y="34" width="38" height="8.5" rx="0" fill="#1d4ab0"/><path d="M27 34l5-9 5 9z" fill="#ff3b4f" stroke="#fff" stroke-width=".6"/>${jelly(15, 28, 11, '#ffd21f')}`);
+  I.g_platformer = tile('#6fb7ff', '#2a74d8', `<path d="M8 36l6-3h9l-6 3z" fill="#56c943"/><path d="M8 36h9v3H8z" fill="#2f8f2a"/><path d="M22 27l5-3h9l-5 3z" fill="#ffb13d"/><path d="M22 27h9v3h-9z" fill="#c97a10"/><path d="M30 17l4-2h7l-4 2z" fill="#ef5350"/><path d="M30 17h7v2.5h-7z" fill="#b8302d"/><polygon points="${starPts(36, 10, 4, 1.7)}" fill="#ffd21f" stroke="#c07000" stroke-width=".5"/>`);
+  I.g_cuberun =tile('#5b5fe8', '#39c6f0', `<rect x="5" y="34" width="38" height="8.5" rx="0" fill="#1d4ab0"/><path d="M27 34l5-9 5 9z" fill="#ff3b4f" stroke="#fff" stroke-width=".6"/>${jelly(15, 28, 11, '#ffd21f')}`);
 }
 
 export const ICONS = I;

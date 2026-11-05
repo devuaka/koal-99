@@ -1000,6 +1000,18 @@ export const COMMANDS: Record<string, Cmd> = {
       ctx.print('KOAL-99 has checked the file system and found problems. They were not fixed.');
     },
   },
+  resetalldata: {
+    help: 'Erases ALL KOAL-99 data in this browser (files, users, settings, game saves) and starts fresh.',
+    async run(_, ctx) {
+      ctx.print('WARNING: this erases every pretend file, every user account and password, all settings,', 'err');
+      ctx.print('game saves and high scores, Buddi, sticky notes and friends. KOAL-99 will start like new.', 'err');
+      const a = await ctx.ask('Type RESET to erase everything, or anything else to cancel: ');
+      if (a.trim() !== 'RESET') return ctx.print('Cancelled. Nothing was erased.');
+      ctx.print('Erasing all data...', 'dim');
+      await ctx.sleep(600);
+      fs.wipeAllData();
+    },
+  },
   format: {
     help: 'Formats a disk. (Do not.)',
     async run([drive], ctx) {

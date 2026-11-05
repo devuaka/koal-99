@@ -2,6 +2,7 @@
 // moving lifts, vanishing tiles, checkpoints and best times (saved in 'koalos.plat').
 import { useEffect, useRef, useState } from 'react';
 import { createR3, hexRgb, V3 } from './r3';
+import { sfx } from '../../core/sfx';
 
 const LEVELS = [
   { name: 'Meadow Steps', diff: 'Easy', ratio: 0.25, segs: 8, size: [4, 5.5], lat: 1, rise: [0, 0.3], mv: 0, lift: 0, van: 0, cp: 0, per: 9, travel: 3, sky: '#6fb7ff', fog: '#d5eeff', pal: ['#5cb85c', '#8bc34a', '#f0ad4e', '#66bb6a'], dec: ['#a5d6a7', '#c5e1a5', '#ffe082'] },
@@ -132,7 +133,7 @@ export function Platformer() {
     type B = Plat & { y: number; h: number; col: V3; dx: number; dz: number; dy: number; vis: boolean; px: number; pz: number; ptop: number };
     let lvl = 1, Lv = genLevel(1), Bs: B[] = [], DEC: { c: V3; s: V3; col: V3 }[] = [], coins: { x: number; y: number; z: number; got: boolean }[] = [], fogC: V3 = [0.8, 0.9, 1];
     let p = { x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0, ground: false, ride: null as B | null }, pp = { x: 0, y: 0, z: 0 };
-    let yaw = 0, pitch = -0.12, tt = 0, isWon = false, clock = 0, keys: Record<string, boolean> = {}, coyote = 0, buf = 0, paused = true, respawn = { x: 0, y: 0, z: 0 }, falls = 0, flashT = 0, dragging = false;
+    let yaw = 0, pitch = -0.12, tt = 0, isWon = false, clock = 0, keys: Record<string, boolean> = {}, coyote = 0, buf = 0, paused = true, respawn = { x: 0, y: 0, z: 0 }, falls = 0, flashT = 0, dragging = false, stepT = 0;
     const doFlash = (t: string) => {
       if (flash.current) (flash.current.textContent = t), (flash.current.style.opacity = '1');
       flashT = 1.6;
@@ -183,6 +184,7 @@ export function Platformer() {
     const overlapXZ = (b: B) => Math.abs(p.x - b.x) < b.w / 2 + HS && Math.abs(p.z - b.z) < b.d / 2 + HS;
     const win = () => {
       isWon = true;
+      sfx.win();
       const got = coins.filter((c) => c.got).length, t = clock, sv = loadSave();
       const prevBest = sv.best[lvl], newBest = prevBest == null || t < prevBest;
       if (newBest) sv.best[lvl] = +t.toFixed(1);
@@ -221,6 +223,7 @@ export function Platformer() {
       if ((buf > 0 || keys.space) && coyote > 0 && !isWon) {
         p.vy = 11;
         p.ground = false;
+        sfx.whoosh(true, { vol: 0.35, pitch: 1.2 });
         coyote = 0;
         buf = 0;
       }
@@ -231,6 +234,7 @@ export function Platformer() {
       for (const b of Bs) if (b.vis && overlapXZ(b) && p.y < b.top - 0.15 && p.y + PH > b.y) (p.x = p.vx > 0 || p.x < b.x ? b.x - b.w / 2 - HS - 0.001 : b.x + b.w / 2 + HS + 0.001), (p.vx = 0);
       p.z += p.vz * dt;
       for (const b of Bs) if (b.vis && overlapXZ(b) && p.y < b.top - 0.15 && p.y + PH > b.y) (p.z = p.vz > 0 || p.z < b.z ? b.z - b.d / 2 - HS - 0.001 : b.z + b.d / 2 + HS + 0.001), (p.vz = 0);
+      const wasGround = p.ground, fallV = p.vy;
       p.y += p.vy * dt;
       p.ground = false;
       p.ride = null;
@@ -244,6 +248,8 @@ export function Platformer() {
           if (b.cp && (respawn.x !== b.x || respawn.z !== b.z)) {
             respawn = { x: b.x, y: b.top, z: b.z };
             doFlash('Checkpoint!');
+            sfx.coin({ pitch: 0.75 });
+            sfx.marimba(7);
           }
         } else if (p.vy > 0 && prevY + PH <= b.y + 0.05) (p.y = b.y - PH), (p.vy = 0);
       }
@@ -252,8 +258,15 @@ export function Platformer() {
         pp = { x: p.x, y: p.y, z: p.z };
         falls++;
         doFlash('Fell! Try again');
+        sfx.whoosh(false, { vol: 0.6, pitch: 0.6 });
+        sfx.thud({ vol: 0.5 });
       }
-      for (const c of coins) if (!c.got && Math.hypot(c.x - p.x, c.y - (p.y + 0.6), c.z - p.z) < 1.1) c.got = true;
+      if (p.ground && !wasGround && fallV < -6) sfx.thud({ vol: Math.min(1, -fallV / 20), pitch: 1.3 });
+      if (p.ground && Math.hypot(p.vx, p.vz) > 1) {
+        stepT -= dt * Math.hypot(p.vx, p.vz);
+        if (stepT <= 0) (stepT = 2.1), sfx.step('wood', { vol: 0.45 });
+      }
+      for (const c of coins) if (!c.got && Math.hypot(c.x - p.x, c.y - (p.y + 0.6), c.z - p.z) < 1.1) (c.got = true), sfx.coin();
       const g = Lv.goal;
       if (!isWon && Math.hypot(g.x - p.x, g.y - (p.y + 0.6), g.z - p.z) < 1.6) win();
       if (flashT > 0) {

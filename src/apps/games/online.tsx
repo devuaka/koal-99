@@ -1,5 +1,6 @@
 // Pong and Chess: play the computer, or a friend online with a room code (same rooms as koalOS).
 import { KoalRoom } from '../../core/net';
+import { sfx } from '../../core/sfx';
 import { GameApi, GameDef, gloss, label, orb, sky } from './kit';
 
 const TAU = Math.PI * 2;
@@ -81,25 +82,29 @@ export const pong: GameDef = {
       if (cd > 0) return void (cd -= dt);
       bx += vx * dt;
       by += vy * dt;
-      if (by < 6) (by = 6), (vy = Math.abs(vy));
-      if (by > 394) (by = 394), (vy = -Math.abs(vy));
+      if (by < 6) (by = 6), (vy = Math.abs(vy)), sfx.knock({ pitch: 1.5, vol: 0.35 });
+      if (by > 394) (by = 394), (vy = -Math.abs(vy)), sfx.knock({ pitch: 1.5, vol: 0.35 });
       if (vx < 0 && bx < 28 && bx > 14 && by > py - 4 && by < py + H + 4) {
         vx = Math.abs(vx) * 1.06;
+        sfx.knock({ pitch: 0.9 });
         vy += ((by - (py + H / 2)) / (H / 2)) * 180;
         bx = 28;
       }
       if (vx > 0 && bx > 572 && bx < 586 && by > ay - 4 && by < ay + H + 4) {
         vx = -Math.abs(vx) * 1.06;
+        sfx.knock({ pitch: 0.8 });
         vy += ((by - (ay + H / 2)) / (H / 2)) * 180;
         bx = 572;
       }
       if (bx < -10) {
         as++;
+        sfx.pluck(0, { vol: 0.6 });
         serve(1);
         if (as >= 7) finish();
       }
       if (bx > 610) {
         ps++;
+        sfx.coin();
         if (mode === 'cpu' || role === 'host') a.addScore(10);
         serve(-1);
         if (ps >= 7) finish();
@@ -413,6 +418,7 @@ export const chess: GameDef = {
     const checkState = () => {
       const mv = legalMoves(board, { castle, ep }, turn), kp = kingPos(board, turn), inCheck = attacks(board, opp(turn)).has(kp[0] + ',' + kp[1]);
       checkSq = inCheck ? kp : null;
+      if (inCheck && mv.length) sfx.coin({ pitch: 0.7 });
       if (mv.length) return false;
       ended = true;
       if (!inCheck) a.over('Stalemate: a draw');
@@ -425,6 +431,8 @@ export const chess: GameDef = {
     };
     const play = (m: Move, remote = false) => {
       const n = applyMove(board, { castle, ep }, m);
+      const captured = !!board[m.tr][m.tc] || m.flag === 'ep';
+      captured ? sfx.thud({ vol: 0.7 }) : sfx.knock({ pitch: 0.85 });
       board = n.board;
       castle = n.castle;
       ep = n.ep;

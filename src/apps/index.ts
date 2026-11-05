@@ -78,5 +78,6 @@ export function registerAll() {
   registerApp({ id: 'kbackrooms', name: 'Backrooms', icon: 'backrooms', component: Backrooms, w: 980, h: 660, minW: 520, minH: 380, category: 'games', description: 'Do not get lost' });
   registerApp({ id: 'kembed', name: 'Web page', icon: 'web', component: EmbedApp, w: 808, h: 642, minW: 300, minH: 200, hidden: true, category: 'koalos', description: 'Shows one web page' });
   registerApp({ id: 'kgame', name: 'koal.games game', icon: 'game', component: GameWindow, w: 520, h: 600, minW: 260, minH: 260, hidden: true, category: 'games', description: 'One koal.games arcade game' });
+  registerApp({ id: 'kplatformer', name: '3D Platformer', icon: 'g_platformer', w: 0, h: 0, category: 'games', description: '10 levels of 3D jumping, easy to super hard', run: () => launchApp('browser', { url: 'koal://3d-platformer' }) });
   registerApp({ id: 'karcade', name: 'koal.games', icon: 'game', w: 0, h: 0, category: 'games', description: '17 arcade games, plus a 3D platformer', run: () => launchApp('browser', { url: 'koal://games' }) });
 }

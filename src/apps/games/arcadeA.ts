@@ -1,4 +1,5 @@
 // koal.games, part 1: Snake, Brick Bash, Flappy Cube, Tile Merge, Minesweeper, Memory Match, Tic-Tac-Toe.
+import { sfx } from '../../core/sfx';
 import { Ctx, GameDef, bubbles, gloss, jellyCube, label, orb, rr, sky, starPath } from './kit';
 
 const TAU = Math.PI * 2;
@@ -33,10 +34,11 @@ export const snake: GameDef = {
           acc -= step;
           dir = nd;
           const h = { x: s[0].x + dir.x, y: s[0].y + dir.y };
-          if (h.x < 0 || h.y < 0 || h.x >= N || h.y >= N || s.some((p) => p.x === h.x && p.y === h.y)) return a.over('Ouch!');
+          if (h.x < 0 || h.y < 0 || h.x >= N || h.y >= N || s.some((p) => p.x === h.x && p.y === h.y)) return sfx.thud(), a.over('Ouch!');
           s.unshift(h);
           if (h.x === food.x && h.y === food.y) {
             a.addScore(10);
+            sfx.pop({ pitch: 0.8 + Math.min(1.2, s.length * 0.03) });
             if (++eaten % 5 === 0) step = Math.max(0.05, step - 0.01);
             place();
           } else s.pop();
@@ -124,17 +126,19 @@ export const brick: GameDef = {
         }
         ball.x += ball.vx * dt;
         ball.y += ball.vy * dt;
-        if (ball.x < 7) (ball.x = 7), (ball.vx = Math.abs(ball.vx));
-        if (ball.x > 473) (ball.x = 473), (ball.vx = -Math.abs(ball.vx));
-        if (ball.y < 7) (ball.y = 7), (ball.vy = Math.abs(ball.vy));
+        if (ball.x < 7) (ball.x = 7), (ball.vx = Math.abs(ball.vx)), sfx.knock({ vol: 0.35, pitch: 1.4 });
+        if (ball.x > 473) (ball.x = 473), (ball.vx = -Math.abs(ball.vx)), sfx.knock({ vol: 0.35, pitch: 1.4 });
+        if (ball.y < 7) (ball.y = 7), (ball.vy = Math.abs(ball.vy)), sfx.knock({ vol: 0.35, pitch: 1.4 });
         if (ball.vy > 0 && ball.y > 492 && ball.y < 510 && ball.x > px - 4 && ball.x < px + PW + 4) {
           ball.vy = -Math.abs(ball.vy);
           ball.vx = ((ball.x - (px + PW / 2)) / (PW / 2)) * 260;
+          sfx.knock({ pitch: 0.8 });
         }
         for (const b of bricks)
           if (b.alive && ball.x > b.x - 6 && ball.x < b.x + b.w + 6 && ball.y > b.y - 6 && ball.y < b.y + b.h + 6) {
             b.alive = false;
             a.addScore(10);
+            sfx.marimba(Math.max(0, 9 - Math.round((b.y - 50) / 24)), { vol: 0.8 });
             const ox = Math.min(ball.x - b.x + 6, b.x + b.w + 6 - ball.x), oy = Math.min(ball.y - b.y + 6, b.y + b.h + 6 - ball.y);
             if (ox < oy) ball.vx *= -1;
             else ball.vy *= -1;
@@ -144,10 +148,12 @@ export const brick: GameDef = {
           level++;
           build();
           ball.on = true;
+          sfx.win();
         }
         if (ball.y > 530) {
           lives--;
           ball.on = true;
+          if (lives > 0) sfx.thud();
           if (lives <= 0) a.over('Game over');
         }
       },
@@ -176,6 +182,7 @@ export const flappy: GameDef = {
     const flap = () => {
       started = true;
       vy = -330;
+      sfx.whoosh(true, { vol: 0.45, pitch: 1.3 });
     };
     const pipe = (c: Ctx, x: number, y0: number, h: number) => {
       const g = c.createLinearGradient(x, 0, x + 52, 0);
@@ -209,12 +216,13 @@ export const flappy: GameDef = {
           p.x -= 170 * dt;
           if (!p.passed && p.x + 26 < 90) {
             p.passed = true;
+            sfx.coin({ vol: 0.6 });
             a.addScore(1);
           }
-          if (90 + 14 > p.x && 90 - 14 < p.x + 52 && (y - 14 < p.gap - 75 || y + 14 > p.gap + 75)) a.over('Splat!');
+          if (90 + 14 > p.x && 90 - 14 < p.x + 52 && (y - 14 < p.gap - 75 || y + 14 > p.gap + 75)) (sfx.thud(), a.over('Splat!'));
         }
         pipes = pipes.filter((p) => p.x > -60);
-        if (y > 506 || y < -20) a.over('Splat!');
+        if (y > 506 || y < -20) (sfx.thud(), a.over('Splat!'));
       },
       draw(c) {
         sky(c, 400, 560, '#3d9ff0', '#d8f2ff');
@@ -310,6 +318,8 @@ export const tiles: GameDef = {
       if (JSON.stringify(ng) === JSON.stringify(g)) return;
       g = ng;
       a.addScore(gain);
+      sfx.whoosh(d === 'U' || d === 'R', { vol: 0.3, pitch: 1.6 });
+      if (gain) sfx.marimba(Math.min(10, Math.round(Math.log2(Math.max(...ng.flat()))) - 1), { vol: 0.7 });
       add();
       if (!won && g.some((r) => r.includes(2048))) {
         won = true;
@@ -393,6 +403,7 @@ export const mines: GameDef = {
       c.r = true;
       if (c.m) {
         lost = true;
+        sfx.boom(0.8);
         return a.over('Boom!');
       }
       if (!c.n) nb(x, y, (X, Y) => reveal(X, Y));
@@ -434,6 +445,7 @@ export const mines: GameDef = {
           if (!c.r) {
             c.f = !c.f;
             flags += c.f ? 1 : -1;
+            sfx.knock({ pitch: c.f ? 1.3 : 0.9, vol: 0.6 });
           }
           return;
         }
@@ -446,6 +458,7 @@ export const mines: GameDef = {
           nb(X, Y, (_x, _y, cc) => cc.f && f++);
           if (f === c.n) nb(X, Y, (x2, y2, cc) => !cc.f && reveal(x2, y2));
         } else reveal(X, Y);
+        if (!lost) sfx.click({ pitch: 0.8 + Math.random() * 0.3 });
         check();
       },
       draw(c) {
@@ -584,17 +597,19 @@ export const memory: GameDef = {
         const i = Y * 4 + X, d = deck[i];
         if (d.up || d.ok) return;
         d.up = true;
+        sfx.flip();
         if (first < 0) return void (first = i);
         moves++;
         if (deck[first].s === d.s) {
           deck[first].ok = d.ok = true;
           first = -1;
           a.addScore(100);
+          sfx.coin();
           if (++pairs === 8) {
             a.setScore(Math.max(100, 1000 - moves * 30));
             a.over('You matched them all!');
           }
-        } else lock = 0.75;
+        } else (lock = 0.75), sfx.knock({ pitch: 0.6, vol: 0.5 });
       },
       draw(c) {
         sky(c, 400, 440, '#2b6fd0', '#0d2a63');
@@ -645,8 +660,9 @@ export const ttt: GameDef = {
       if (win(b, 'X')) {
         res = 'You win! Click to play again';
         a.addScore(10);
-      } else if (win(b, 'O')) res = 'The computer wins. Click to play again';
-      else if (b.every((x) => x)) res = 'Draw. Click to play again';
+        sfx.win();
+      } else if (win(b, 'O')) (res = 'The computer wins. Click to play again'), sfx.lose();
+      else if (b.every((x) => x)) (res = 'Draw. Click to play again'), sfx.pluck(2);
       turnP = true;
     };
     const ai = () => {
@@ -658,7 +674,7 @@ export const ttt: GameDef = {
           b[i] = '';
           if (v > bv || (v === bv && Math.random() < 0.3)) (bv = v), (bi = i);
         }
-      if (bi >= 0) b[bi] = 'O';
+      if (bi >= 0) (b[bi] = 'O'), sfx.knock({ pitch: 0.75 });
       fin();
     };
     let timer = 0;
@@ -676,6 +692,7 @@ export const ttt: GameDef = {
         const i = Y * 3 + X;
         if (b[i] || !turnP) return;
         b[i] = 'X';
+        sfx.knock({ pitch: 1.1 });
         fin();
         if (!res) {
           turnP = false;

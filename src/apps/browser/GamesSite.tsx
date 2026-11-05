@@ -48,6 +48,12 @@ export function GamesSite({ sub, nav }: { sub: string; nav: (u: string) => void 
     );
   }
   const hs = hsAll();
+  let plat = 0;
+  try {
+    plat = Object.keys(JSON.parse(localStorage.getItem('koalos.plat') || '{}').best || {}).length;
+  } catch {
+    /* no saves yet */
+  }
   return (
     <div className="kgs">
       <div className="kgs-head">
@@ -82,6 +88,16 @@ export function GamesSite({ sub, nav }: { sub: string; nav: (u: string) => void 
             </div>
           </div>
         ))}
+        <div className="kgs-card">
+          <Icon name="g_platformer" size={48} />
+          <b>3D Platformer</b>
+          <span className="kgs-badge">3D</span>
+          <p>Jump across floating platforms through 10 levels, from easy to super hard.</p>
+          <small>{plat ? `Levels beaten: ${plat}` : 'Not played yet'}</small>
+          <div className="kgs-row">
+            <button className="k-btn default" onClick={() => nav('koal://3d-platformer')}>Play</button>
+          </div>
+        </div>
       </div>
     </div>
   );

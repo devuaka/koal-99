@@ -2,6 +2,7 @@
 // saved as .lxo files or shared as codes (same format as koalOS).
 import * as fs from '../../core/fs';
 import { desktopDir } from '../../core/session';
+import { sfx } from '../../core/sfx';
 import { Ctx, GameDef, gloss, hsGet, hsSet, jellyCube, label, sky } from './kit';
 
 const LEVELS = [
@@ -113,6 +114,7 @@ export const cuberun: GameDef = {
     const jump = () => {
       if (mode === 'play' && grounded && !dead) {
         vy = -JUMPV;
+        sfx.whoosh(true, { vol: 0.35, pitch: 1.4 });
         grounded = false;
       }
     };
@@ -221,7 +223,7 @@ export const cuberun: GameDef = {
           const cs = 28, baseY = 300;
           if (y < baseY - cs || y > baseY) return;
           const i = Math.floor(editScroll) + Math.floor((x - 10) / cs);
-          if (i >= 0 && i < editL.length) editL[i] = (editL[i] + 1) % 3;
+          if (i >= 0 && i < editL.length) (editL[i] = (editL[i] + 1) % 3), sfx.click();
         }
       },
       update(dt) {
@@ -234,6 +236,7 @@ export const cuberun: GameDef = {
         const col = Math.floor(worldX / CW), hz = L[col];
         if ((hz === 1 && py > -18) || (hz === 2 && py > -32)) {
           dead = true;
+          sfx.crunch();
           const p = pct();
           if (p > bestPct) {
             bestPct = p;
@@ -244,6 +247,7 @@ export const cuberun: GameDef = {
         }
         if (col >= L.length) {
           if (levelKey) hsSet(levelKey, 100);
+          sfx.win();
           a.setScore(100);
           if (fromEditor) {
             editMsg = 'You beat your level!';

@@ -9,6 +9,11 @@ import { Character, blobShadow } from '../models';
 import { Look } from '../r3';
 import { LobbyResult, RoomLobby } from '../Lobby';
 import { reportHosted } from '../../../core/invites';
+import { sfx, spatial } from '../../../core/sfx';
+
+type GunKind = Parameters<typeof sfx.gun>[0];
+/** Which gunshot sound each weapon makes. */
+const GUN_SOUND: Record<string, GunKind> = { pistol: 'pistol', akimbo: 'pistol', revolver: 'pistol', handcrossbow: 'crossbow', crossbow: 'crossbow', smg: 'smg', tacsmg: 'smg', rifle: 'rifle', burst: 'rifle', boltcarbine: 'rifle', marksman: 'rifle', autosniper: 'sniper', sniper: 'sniper', shotgun: 'shotgun', combatshotgun: 'shotgun', minigun: 'heavy', chaingun: 'heavy', grenade: 'launcher', rocketlauncher: 'launcher', nukelauncher: 'launcher', flamethrower: 'flame', machete: 'melee', railgun: 'laser', deathlaser: 'laser', plasmarifle: 'laser', ioncannon: 'laser', voidripper: 'laser', singularity: 'laser' };
 import { buildGun, Gun } from './guns';
 import { Box, LAVA, MAP_NAMES, PROFILE_KEY, RGB, S, SCOPED, SCOPE_FOV, SKILL_TREE, WEAPONS, WEAPON_KEYS, WIN_KILLS, allMapNames, genMap, spawnsFor } from './data';
 
@@ -448,7 +453,8 @@ function Game({ s, col, forceMap, onExit }: { s: LobbyResult; col: RGB; forceMap
       if (winner) return;
       winner = id;
       center(nameOf(id) + ' wins the match!');
-      if (id === myId) addCoins(3);
+      if (id === myId) addCoins(3), sfx.win();
+      else sfx.lose();
     };
     const killed = (by: string, victim: string) => {
       const k = scoreOf(by) as { kills: number };
@@ -513,9 +519,11 @@ function Game({ s, col, forceMap, onExit }: { s: LobbyResult; col: RGB; forceMap
           } else if (d.t === 'shot') {
             addTracer(d.a, d.b, d.big ? [1, 0.15, 0.15] : colorOf(id), !!d.big);
             addFx(d.a, 'flash', 0.6);
+            sfx.gun(GUN_SOUND[o.wpn] ?? (d.big ? 'laser' : 'rifle'), spatial(d.a[0], d.a[2], me.x, me.z, look.yaw, 45));
           } else if (d.t === 'hit' && d.to === myId && me.alive) {
             me.hp -= d.dmg;
             dmgAt = performance.now();
+            sfx.hurt();
             if (me.hp <= 0) {
               me.alive = false;
               me.hp = 0;
@@ -548,7 +556,7 @@ function Game({ s, col, forceMap, onExit }: { s: LobbyResult; col: RGB; forceMap
       const spd = keys.shift ? 8.6 : 6, k = Math.min(1, dt * (me.ground ? 14 : 5));
       me.vx += (dx * spd - me.vx) * k;
       me.vz += (dz * spd - me.vz) * k;
-      if (keys.space && me.ground) (me.vy = 9.2), (me.ground = false);
+      if (keys.space && me.ground) (me.vy = 9.2), (me.ground = false), sfx.whoosh(true, { vol: 0.25, pitch: 1.3 });
       me.vy -= 26 * dt;
       const py = me.y;
       me.x += me.vx * dt;
@@ -563,7 +571,11 @@ function Game({ s, col, forceMap, onExit }: { s: LobbyResult; col: RGB; forceMap
         if (me.vy <= 0 && py >= b.top - 0.06) (me.y = b.top), (me.vy = 0), (me.ground = true);
         else if (me.vy > 0 && py + PH <= b.y + 0.06) (me.y = b.y - PH), (me.vy = 0);
       }
-      if (l > 0.1 && me.ground) bobT += dt * (keys.shift ? 12 : 9);
+      if (l > 0.1 && me.ground) {
+        bobT += dt * (keys.shift ? 12 : 9);
+        stepAcc += dt * (keys.shift ? 12 : 9);
+        if (stepAcc > Math.PI) (stepAcc -= Math.PI), sfx.step(mapVariant === LAVA ? 'stone' : 'concrete', { vol: keys.shift ? 0.6 : 0.4 });
+      }
     };
 
     // ---- shooting ----
@@ -597,17 +609,20 @@ function Game({ s, col, forceMap, onExit }: { s: LobbyResult; col: RGB; forceMap
       if (me.reloading || !isFinite(wp.mag) || me.ammo >= wp.mag) return;
       me.reloading = true;
       me.reloadEndAt = performance.now() + wp.reload * 1000;
+      sfx.reload();
     };
-    let hitAt = 0, dmgAt = 0, kickAt = 0, swingAt = 0, bobT = 0, aim = 0, scoped = false, mouseL = false, fireCool = 0, isPaused = true;
+    let hitAt = 0, dmgAt = 0, kickAt = 0, swingAt = 0, bobT = 0, stepAcc = 0, aim = 0, scoped = false, mouseL = false, fireCool = 0, isPaused = true;
     const fire = () => {
       if (!me.alive || winner || me.reloading) return;
       const wp = WEAPONS[me.weapon];
-      if (!wp.melee && me.ammo <= 0) return startReload();
+      if (!wp.melee && me.ammo <= 0) return sfx.dry(), startReload();
+      sfx.gun(GUN_SOUND[me.weapon] ?? 'pistol', { vol: 0.85 });
       if (!wp.melee) me.ammo--;
       const o = [me.x, me.y + EYE, me.z], cp = Math.cos(look.pitch), sp = Math.sin(look.pitch);
       const moveMul = Math.hypot(me.vx, me.vz) > 2 ? 1.7 : 1, aimMul = 1 - aim * 0.6, maxDist = wp.melee ? wp.range! : 80;
       const hitOne = (p: Person) => {
         hitAt = performance.now();
+        sfx.hitmark();
         p.ch.hurt = 0.15;
         if (p.dummy) {
           p.hp -= wp.dmg;
@@ -617,6 +632,7 @@ function Game({ s, col, forceMap, onExit }: { s: LobbyResult; col: RGB; forceMap
             me.kills++;
             addKillCoins();
             addFeed('You eliminated ' + p.name);
+            sfx.coin();
             if (me.kills >= WIN_KILLS && !winner) declareWinner(myId);
           }
         } else room?.send({ t: 'hit', to: p.id, dmg: wp.dmg });
@@ -651,6 +667,7 @@ function Game({ s, col, forceMap, onExit }: { s: LobbyResult; col: RGB; forceMap
         if (along.length) wp.pierce ? along.forEach((h) => hitOne(h.p)) : hitOne(along[0].p);
         if (wp.splash) {
           addFx(end, 'boom', wp.splash / 3);
+          sfx.boom(Math.min(2, wp.splash / 3), spatial(end[0], end[2], me.x, me.z, look.yaw, 60));
           const already = new Set(along.length && !wp.pierce ? [along[0].p] : along.map((h) => h.p));
           for (const p of targets) if (p.alive && !already.has(p) && Math.hypot(p.x - end[0], p.y + PH / 2 - end[1], p.z - end[2]) <= wp.splash) hitOne(p);
         }
@@ -827,6 +844,7 @@ function Game({ s, col, forceMap, onExit }: { s: LobbyResult; col: RGB; forceMap
         if (!me.alive && now >= me.respawnAt && !winner) spawn();
         if (mapVariant === LAVA && me.alive && me.y <= 0.05) {
           me.hp -= 55 * dt;
+          if (now - dmgAt > 400) sfx.hurt(), sfx.gun('flame', { vol: 0.5, pitch: 0.7 });
           dmgAt = now;
           if (me.hp <= 0) {
             me.hp = 0;
@@ -867,10 +885,12 @@ function Game({ s, col, forceMap, onExit }: { s: LobbyResult; col: RGB; forceMap
               const a2 = Math.max(0.15, 1 - dist / 28), dmg = Math.round((10 + Math.random() * 8) * a2);
               const from = d.gun ? d.gun.muzzle.getWorldPosition(tmp).toArray() : [d.x, d.y + 1.4, d.z];
               const hitMe = Math.random() < 0.75 * a2 + 0.1;
+              sfx.gun('pistol', spatial(d.x, d.z, me.x, me.z, look.yaw, 45));
               addTracer(from, hitMe ? [me.x, me.y + 1.3, me.z] : [me.x + (Math.random() - 0.5) * 2, me.y + 1 + Math.random(), me.z + (Math.random() - 0.5) * 2], [1, 0.6, 0.2], false);
               if (hitMe) {
                 me.hp -= dmg;
                 dmgAt = now;
+                sfx.hurt();
                 if (me.hp <= 0 && me.alive) {
                   me.alive = false;
                   me.hp = 0;
